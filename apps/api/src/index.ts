@@ -1,12 +1,12 @@
-import './env.js';
+import './env';
 import express from 'express';
 import cors from 'cors';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
-import { appRouter, type AppRouter } from './trpc/router.js';
-export { type AppRouter } from './trpc/router.js';
-import { createContext } from './trpc/trpc.js';
-import debugRouter from './routes/debug.js';
-import vapiRouter from './routes/vapi-webhook.js';
+import { appRouter, type AppRouter } from './trpc/router';
+export { type AppRouter } from './trpc/router';
+import { createContext } from './trpc/trpc';
+import debugRouter from './routes/debug';
+import vapiRouter from './routes/vapi-webhook';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
