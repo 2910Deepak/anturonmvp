@@ -32,19 +32,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build API (ignore type errors)
-        run: cd apps/api && npx tsc --noEmit false --skipLibCheck true --noUnusedLocals false --noUnusedParameters false 2>/dev/null || npx tsc --skipLibCheck --noEmitOnError false 2>/dev/null || true
-        
       - name: Create deployment package
         run: |
-          mkdir -p deploy-api
-          cp -r apps/api/src deploy-api/src
-          cp apps/api/package.json deploy-api/
-          cp apps/api/tsconfig.json deploy-api/ 2>/dev/null || true
-          cp pnpm-lock.yaml deploy-api/ 2>/dev/null || true
-          # node_modules copy karo
-          cp -r node_modules deploy-api/node_modules 2>/dev/null || true
-          cp -r apps/api/node_modules deploy-api/node_modules_api 2>/dev/null || true
+          mkdir -p deploy-api/packages/database
+          mkdir -p deploy-api/packages/shared
+          mkdir -p deploy-api/apps/api
+
+          # Copy API source
+          cp -r apps/api/src deploy-api/apps/api/src
+          cp apps/api/package.json deploy-api/apps/api/
+          cp apps/api/tsconfig.json deploy-api/apps/api/ 2>/dev/null || true
+
+          # Copy packages
+          cp -r packages/database deploy-api/packages/
+          cp -r packages/shared deploy-api/packages/
+
+          # Copy workspace files
+          cp pnpm-workspace.yaml deploy-api/
+          cp package.json deploy-api/
+          cp pnpm-lock.yaml deploy-api/
+
+          # Create startup script at root
+          cat > deploy-api/startup.sh << 'STARTUP'
+          #!/bin/bash
+          cd /home/site/wwwroot/apps/api
+          ./node_modules/.bin/tsx src/index.ts
+          STARTUP
+
           cd deploy-api && zip -r ../api-deploy.zip .
 
       - name: Deploy API to Azure App Service
@@ -76,13 +90,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Web (Next.js)
-        run: cd apps/web && pnpm build 2>/dev/null || NEXT_TELEMETRY_DISABLED=1 npx next build --no-lint 2>/dev/null || true
+      - name: Build Web
+        working-directory: apps/web
+        run: npx next build --no-lint || true
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           SKIP_ENV_VALIDATION: true
 
-      - name: Create deployment package (Web)
+      - name: Create deployment package
         run: |
           mkdir -p deploy-web
           cp -r apps/web/.next deploy-web/ 2>/dev/null || true
