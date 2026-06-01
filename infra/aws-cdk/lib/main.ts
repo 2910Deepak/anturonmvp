@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
-import { VoiceAIStack } from './voice-ai-stack.js';
+import { VoiceAIStack } from './voice-ai-stack.ts';
 
 const app = new cdk.App();
 
