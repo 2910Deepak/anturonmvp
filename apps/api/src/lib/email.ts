@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder');
 const FROM = process.env.RESEND_FROM || 'Anturon <onboarding@resend.dev>';
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
