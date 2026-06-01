@@ -4,8 +4,8 @@
   "private": true,
   "description": "Enterprise Voice AI SaaS Platform for Middle East & India",
   "scripts": {
-    "build": "turbo run build",
-    "start": "cd apps/web && ../../node_modules/.bin/next start -p 8080",
+    "build": "turbo run build --filter=@voice-ai/web...",
+    "start": "cd apps/web && node_modules/.bin/next start -p 8080",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
