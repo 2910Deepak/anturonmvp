@@ -35,13 +35,16 @@ jobs:
       - name: Build API (ignore type errors)
         run: cd apps/api && npx tsc --noEmit false --skipLibCheck true --noUnusedLocals false --noUnusedParameters false 2>/dev/null || npx tsc --skipLibCheck --noEmitOnError false 2>/dev/null || true
         
-      - name: Create deployment package (API)
+      - name: Create deployment package
         run: |
           mkdir -p deploy-api
-          cp -r apps/api/src deploy-api/
+          cp -r apps/api/src deploy-api/src
           cp apps/api/package.json deploy-api/
           cp apps/api/tsconfig.json deploy-api/ 2>/dev/null || true
-          cp pnpm-workspace.yaml deploy-api/ 2>/dev/null || true
+          cp pnpm-lock.yaml deploy-api/ 2>/dev/null || true
+          # node_modules copy karo
+          cp -r node_modules deploy-api/node_modules 2>/dev/null || true
+          cp -r apps/api/node_modules deploy-api/node_modules_api 2>/dev/null || true
           cd deploy-api && zip -r ../api-deploy.zip .
 
       - name: Deploy API to Azure App Service
