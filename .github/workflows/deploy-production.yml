@@ -39,19 +39,10 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Debug build output
-        run: |
-          echo "=== standalone folder ==="
-          ls -la apps/web/.next/standalone/
-          echo "=== finding server.js ==="
-          find apps/web/.next/standalone -name "server.js" || echo "server.js not found anywhere!"
-
       - name: Create deployment package
         run: |
-          SERVER_JS=$(find apps/web/.next/standalone -name "server.js" | head -1)
-          echo "Found server.js at: $SERVER_JS"
-          STANDALONE_DIR=$(dirname $SERVER_JS)
-          echo "Standalone dir: $STANDALONE_DIR"
+          echo "=== Finding server.js ==="
+          find apps/web/.next/standalone -name "server.js"
           mkdir -p deploy-web
           cp -r apps/web/.next/standalone/. deploy-web/
           mkdir -p deploy-web/.next/static
@@ -59,8 +50,14 @@ jobs:
           if [ -d apps/web/public ]; then
             cp -r apps/web/public/. deploy-web/public/
           fi
+          # Oryx ko disable karne ke liye
+          echo '{ "scripts": { "build": "echo Already built" } }' > deploy-web/package.json
+          # .deployment file add karo
+          echo '[config]' > deploy-web/.deployment
+          echo 'SCM_DO_BUILD_DURING_DEPLOYMENT=false' >> deploy-web/.deployment
           echo "=== deploy-web contents ==="
           ls -la deploy-web/
+          ls -la deploy-web/apps/web/ || true
           cd deploy-web
           zip -r ../web-deploy.zip .
           echo "=== zip size ==="
