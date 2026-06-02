@@ -1,5 +1,4 @@
 'use client';
-
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -10,8 +9,8 @@ export default function DashboardRedirect() {
 
   useEffect(() => {
     if (!isLoading) {
-      if (isAuthenticated && user?.organization?.slug) {
-        router.replace(`/${user.organization.slug}/dashboard`);
+      if (isAuthenticated && (user as any)?.organization?.slug) {
+        router.replace(`/${(user as any).organization.slug}/dashboard`);
       } else {
         router.replace('/login');
       }
