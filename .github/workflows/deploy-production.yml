@@ -35,32 +35,70 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Create deployment package (standalone)
+      - name: Debug - Check build output
         run: |
-          # standalone output banata hai .next/standalone/ mein server.js
-          mkdir -p deploy-web
+          echo "=== Checking .next folder ==="
+          ls -la apps/web/.next/ || echo "NO .next folder!"
+          echo "=== Checking standalone ==="
+          ls -la apps/web/.next/standalone/ || echo "NO standalone folder!"
+          echo "=== Checking server.js ==="
+          ls -la apps/web/.next/standalone/server.js || echo "NO server.js!"
 
-          # standalone folder = poora server
-          cp -r apps/web/.next/standalone/. deploy-web/
+      - name: Create deployment package
+        run: |
+          # Check if standalone exists
+          if [ ! -f "apps/web/.next/standalone/server.js" ]; then
+            echo "ERROR: standalone/server.js not found!"
+            echo "Falling back to regular next start method..."
+            
+            mkdir -p deploy-web/apps/web
+            cp -r apps/web/.next deploy-web/apps/web/.next
+            cp -r apps/web/public deploy-web/apps/web/public 2>/dev/null || true
+            cp apps/web/package.json deploy-web/apps/web/
+            cp -r packages deploy-web/
+            cp package.json deploy-web/
+            cp pnpm-workspace.yaml deploy-web/
+            cp pnpm-lock.yaml deploy-web/
+            cp -r node_modules deploy-web/
 
-          # static assets copy karo
-          mkdir -p deploy-web/.next/static
-          cp -r apps/web/.next/static/. deploy-web/.next/static/
+            cat > deploy-web/server.js << 'SERVEREOF'
+          const { createServer } = require('http');
+          const { parse } = require('url');
+          const next = require('next');
+          const path = require('path');
 
-          # public folder copy karo
-          if [ -d apps/web/public ]; then
-            cp -r apps/web/public deploy-web/public
+          const dev = false;
+          const hostname = '0.0.0.0';
+          const port = parseInt(process.env.PORT || '8080', 10);
+          const dir = path.join(__dirname, 'apps/web');
+
+          const app = next({ dev, hostname, port, dir });
+          const handle = app.getRequestHandler();
+
+          app.prepare().then(() => {
+            createServer(async (req, res) => {
+              try {
+                const parsedUrl = parse(req.url, true);
+                await handle(req, res, parsedUrl);
+              } catch (err) {
+                console.error('Error occurred handling', req.url, err);
+                res.statusCode = 500;
+                res.end('internal server error');
+              }
+            }).listen(port, hostname, (err) => {
+              if (err) throw err;
+              console.log(`> Ready on http://${hostname}:${port}`);
+            });
+          });
+          SERVEREOF
+
+          else
+            echo "Found standalone! Using it..."
+            cp -r apps/web/.next/standalone/. deploy-web/
+            mkdir -p deploy-web/.next/static
+            cp -r apps/web/.next/static/. deploy-web/.next/static/
+            cp -r apps/web/public deploy-web/public 2>/dev/null || true
           fi
-
-          # server.js standalone root mein hoga already
-          # bas PORT set karke chalana hai
-          cat > deploy-web/startup.sh << 'STARTUP'
-          #!/bin/bash
-          export PORT=8080
-          export HOSTNAME=0.0.0.0
-          node /home/site/wwwroot/server.js
-          STARTUP
-          chmod +x deploy-web/startup.sh
 
           cd deploy-web && zip -r ../web-deploy.zip .
 
