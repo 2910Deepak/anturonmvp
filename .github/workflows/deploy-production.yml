@@ -35,72 +35,60 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Debug - Check build output
-        run: |
-          echo "=== Checking .next folder ==="
-          ls -la apps/web/.next/ || echo "NO .next folder!"
-          echo "=== Checking standalone ==="
-          ls -la apps/web/.next/standalone/ || echo "NO standalone folder!"
-          echo "=== Checking server.js ==="
-          ls -la apps/web/.next/standalone/server.js || echo "NO server.js!"
-
       - name: Create deployment package
         run: |
-          # Check if standalone exists
-          if [ ! -f "apps/web/.next/standalone/server.js" ]; then
-            echo "ERROR: standalone/server.js not found!"
-            echo "Falling back to regular next start method..."
-            
-            mkdir -p deploy-web/apps/web
-            cp -r apps/web/.next deploy-web/apps/web/.next
-            cp -r apps/web/public deploy-web/apps/web/public 2>/dev/null || true
-            cp apps/web/package.json deploy-web/apps/web/
-            cp -r packages deploy-web/
-            cp package.json deploy-web/
-            cp pnpm-workspace.yaml deploy-web/
-            cp pnpm-lock.yaml deploy-web/
-            cp -r node_modules deploy-web/
+          mkdir -p deploy-web
 
-            cat > deploy-web/server.js << 'SERVEREOF'
-          const { createServer } = require('http');
-          const { parse } = require('url');
-          const next = require('next');
-          const path = require('path');
+          # Copy entire apps/web WITH node_modules
+          cp -r apps/web deploy-web/apps/web
 
-          const dev = false;
-          const hostname = '0.0.0.0';
-          const port = parseInt(process.env.PORT || '8080', 10);
-          const dir = path.join(__dirname, 'apps/web');
+          # Copy root node_modules (for shared packages)
+          cp -r node_modules deploy-web/node_modules
 
-          const app = next({ dev, hostname, port, dir });
-          const handle = app.getRequestHandler();
+          # Copy packages
+          cp -r packages deploy-web/packages
 
-          app.prepare().then(() => {
-            createServer(async (req, res) => {
-              try {
-                const parsedUrl = parse(req.url, true);
-                await handle(req, res, parsedUrl);
-              } catch (err) {
-                console.error('Error occurred handling', req.url, err);
-                res.statusCode = 500;
-                res.end('internal server error');
-              }
-            }).listen(port, hostname, (err) => {
-              if (err) throw err;
-              console.log(`> Ready on http://${hostname}:${port}`);
-            });
-          });
-          SERVEREOF
+          # Copy workspace files
+          cp package.json deploy-web/
+          cp pnpm-workspace.yaml deploy-web/
+          cp pnpm-lock.yaml deploy-web/
 
-          else
-            echo "Found standalone! Using it..."
-            cp -r apps/web/.next/standalone/. deploy-web/
-            mkdir -p deploy-web/.next/static
-            cp -r apps/web/.next/static/. deploy-web/.next/static/
-            cp -r apps/web/public deploy-web/public 2>/dev/null || true
-          fi
+          # Create server.js at ROOT that points to apps/web
+          cat > deploy-web/server.js << 'SERVEREOF'
+const { createServer } = require('http');
+const { parse } = require('url');
+const path = require('path');
+
+process.chdir(path.join(__dirname, 'apps/web'));
+const next = require('./node_modules/next');
+
+const dev = false;
+const hostname = '0.0.0.0';
+const port = parseInt(process.env.PORT || '8080', 10);
+
+const app = next({ dev, hostname, port, dir: __dirname });
+const handle = app.getRequestHandler();
+
+app.prepare().then(() => {
+  createServer(async (req, res) => {
+    try {
+      const parsedUrl = parse(req.url, true);
+      await handle(req, res, parsedUrl);
+    } catch (err) {
+      console.error('Error:', err);
+      res.statusCode = 500;
+      res.end('internal server error');
+    }
+  }).listen(port, hostname, (err) => {
+    if (err) throw err;
+    console.log(`> Ready on http://${hostname}:${port}`);
+  });
+});
+SERVEREOF
 
           cd deploy-web && zip -r ../web-deploy.zip .
+          echo "=== ZIP size ==="
+          ls -lh ../web-deploy.zip
 
       - name: Deploy Web to Azure App Service
         uses: azure/webapps-deploy@v3
@@ -141,10 +129,10 @@ jobs:
           cp -r node_modules deploy-api/
 
           cat > deploy-api/startup.sh << 'STARTUP'
-          #!/bin/bash
-          cd /home/site/wwwroot/apps/api
-          node_modules/.bin/tsx src/index.ts
-          STARTUP
+#!/bin/bash
+cd /home/site/wwwroot/apps/api
+node_modules/.bin/tsx src/index.ts
+STARTUP
           chmod +x deploy-api/startup.sh
 
           cd deploy-api && zip -r ../api-deploy.zip .
