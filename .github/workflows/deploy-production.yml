@@ -35,33 +35,18 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      -- name: Create deployment package
+    - name: Create deployment package
   run: |
-    mkdir -p deploy-web/apps/web
+    mkdir -p deploy-web
 
-    cp -r apps/web/.next deploy-web/apps/web/.next
-    cp apps/web/package.json deploy-web/apps/web/package.json
+    cp -r apps/web/.next/standalone/* deploy-web/
 
-    cp apps/web/next.config.js deploy-web/apps/web/next.config.js 2>/dev/null || true
-    cp apps/web/next.config.ts deploy-web/apps/web/next.config.ts 2>/dev/null || true
+    mkdir -p deploy-web/.next
+    cp -r apps/web/.next/static deploy-web/.next/static
 
     if [ -d apps/web/public ]; then
-      cp -r apps/web/public deploy-web/apps/web/public
+      cp -r apps/web/public deploy-web/public
     fi
-
-    cp -r node_modules deploy-web/node_modules
-
-    cat > deploy-web/package.json << 'EOF'
-    {
-      "name": "voice-ai-web",
-      "private": true,
-      "scripts": {
-        "start": "cd apps/web && node ../../node_modules/next/dist/bin/next start -p 8080"
-      }
-    }
-    EOF
-
-    ls deploy-web/node_modules/next/package.json
 
     cd deploy-web
     zip -r ../web-deploy.zip .
