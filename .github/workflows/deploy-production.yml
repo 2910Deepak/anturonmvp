@@ -1,19 +1,15 @@
 name: Deploy to Azure Production
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 env:
-  NODE_VERSION: '18.x'
+  NODE_VERSION: '20.x'
   PNPM_VERSION: '9'
-
 jobs:
   deploy-web:
     name: Deploy Web to Azure
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,10 +28,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Fix TypeScript errors
-        run: |
-          sed -i 's/user?.organization?.slug/(user as any)?.organization?.slug/g' apps/web/app/\(dashboard\)/layout.tsx
-
       - name: Build Web
         run: pnpm --filter @voice-ai/web... build
         env:
@@ -46,20 +38,29 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p deploy-web
-          cp -r apps/web/.next deploy-web/
-          cp -r apps/web/public deploy-web/ 2>/dev/null || true
-          cp apps/web/package.json deploy-web/
-          cp apps/web/next.config.js deploy-web/ 2>/dev/null || true
-          cp apps/web/next.config.ts deploy-web/ 2>/dev/null || true
-          cp -r node_modules deploy-web/
+
+          # Copy the entire apps/web folder (with .next inside it)
+          cp -r apps/web deploy-web/
+
+          # Copy packages (shared, database) that web depends on
           cp -r packages deploy-web/
+
+          # Copy root workspace files
+          cp package.json deploy-web/
           cp pnpm-workspace.yaml deploy-web/
+          cp pnpm-lock.yaml deploy-web/
+
+          # Copy node_modules (root level)
+          cp -r node_modules deploy-web/
+
+          # Create startup.sh at ROOT of deploy package
           cat > deploy-web/startup.sh << 'EOF'
           #!/bin/bash
-          cd /home/site/wwwroot
+          cd /home/site/wwwroot/apps/web
           node_modules/.bin/next start -p 8080
           EOF
           chmod +x deploy-web/startup.sh
+
           cd deploy-web && zip -r ../web-deploy.zip .
 
       - name: Deploy Web to Azure App Service
@@ -72,7 +73,6 @@ jobs:
   deploy-api:
     name: Deploy API to Azure
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -91,24 +91,32 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Build API
+        run: pnpm --filter @voice-ai/api... build
+        continue-on-error: true
+
       - name: Create deployment package
         run: |
-          mkdir -p deploy-api/packages/database
-          mkdir -p deploy-api/packages/shared
-          mkdir -p deploy-api/apps/api
-          cp -r apps/api/src deploy-api/apps/api/src
-          cp apps/api/package.json deploy-api/apps/api/
-          cp apps/api/tsconfig.json deploy-api/apps/api/ 2>/dev/null || true
-          cp -r packages/database deploy-api/packages/
-          cp -r packages/shared deploy-api/packages/
-          cp pnpm-workspace.yaml deploy-api/
+          mkdir -p deploy-api
+
+          # Full monorepo structure
+          cp -r apps/api deploy-api/apps/api 2>/dev/null; true
+          mkdir -p deploy-api/apps
+          cp -r apps/api deploy-api/apps/
+          cp -r packages deploy-api/
           cp package.json deploy-api/
+          cp pnpm-workspace.yaml deploy-api/
           cp pnpm-lock.yaml deploy-api/
+          cp -r node_modules deploy-api/
+
+          # Startup script
           cat > deploy-api/startup.sh << 'STARTUP'
           #!/bin/bash
           cd /home/site/wwwroot/apps/api
-          ./node_modules/.bin/tsx src/index.ts
+          node_modules/.bin/tsx src/index.ts
           STARTUP
+          chmod +x deploy-api/startup.sh
+
           cd deploy-api && zip -r ../api-deploy.zip .
 
       - name: Deploy API to Azure App Service
