@@ -32,8 +32,9 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build Web
-        run: pnpm --filter @voice-ai/web... build --force
+        run: pnpm --filter @voice-ai/web... build
         env:
+          TURBO_FORCE: true
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -52,7 +53,7 @@ jobs:
       - name: Create deployment package
         run: |
           if [ ! -f apps/web/.next/standalone/server.js ]; then
-            echo "ERROR: standalone/server.js not found! Build may have failed."
+            echo "ERROR: standalone/server.js not found!"
             exit 1
           fi
           mkdir -p deploy-web
