@@ -38,33 +38,21 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p deploy-web/apps/web
-          mkdir -p deploy-web/node_modules
-
-          # Copy built web app
           cp -r apps/web/.next deploy-web/apps/web/.next
-          cp -r apps/web/public deploy-web/apps/web/public 2>/dev/null || true
           cp apps/web/package.json deploy-web/apps/web/package.json
           cp apps/web/next.config.js deploy-web/apps/web/next.config.js 2>/dev/null || true
           cp apps/web/next.config.ts deploy-web/apps/web/next.config.ts 2>/dev/null || true
-
-          # Copy web node_modules (has next inside)
-          cp -r apps/web/node_modules deploy-web/apps/web/node_modules 2>/dev/null || \
-          cp -r node_modules deploy-web/apps/web/node_modules
-
-          # Copy packages
+          if [ -d apps/web/public ]; then cp -r apps/web/public deploy-web/apps/web/public; fi
+          if [ -d apps/web/node_modules ]; then
+            cp -r apps/web/node_modules deploy-web/apps/web/node_modules
+          else
+            cp -r node_modules deploy-web/apps/web/node_modules
+          fi
           cp -r packages deploy-web/packages
           cp package.json deploy-web/package.json
           cp pnpm-workspace.yaml deploy-web/pnpm-workspace.yaml
-
-          # List what we have
-          echo "=== deploy-web structure ==="
-          ls -la deploy-web/
-          ls -la deploy-web/apps/web/
-          echo "=== next module check ==="
-          ls deploy-web/apps/web/node_modules/next/package.json 2>/dev/null && echo "next FOUND" || echo "next NOT FOUND"
-
-          cd deploy-web && zip -r ../web-deploy.zip .
-          ls -lh ../web-deploy.zip
+          ls deploy-web/apps/web/node_modules/next/package.json && echo "next OK" || echo "next MISSING"
+          cd deploy-web && zip -r ../web-deploy.zip . && ls -lh ../web-deploy.zip
 
       - name: Deploy Web to Azure App Service
         uses: azure/webapps-deploy@v3
@@ -103,12 +91,7 @@ jobs:
           cp pnpm-workspace.yaml deploy-api/
           cp pnpm-lock.yaml deploy-api/
           cp -r node_modules deploy-api/
-
-          cat > deploy-api/startup.sh << 'STARTUP'
-#!/bin/bash
-cd /home/site/wwwroot/apps/api
-node_modules/.bin/tsx src/index.ts
-STARTUP
+          printf '#!/bin/bash\ncd /home/site/wwwroot/apps/api\nnode_modules/.bin/tsx src/index.ts\n' > deploy-api/startup.sh
           chmod +x deploy-api/startup.sh
           cd deploy-api && zip -r ../api-deploy.zip .
 
