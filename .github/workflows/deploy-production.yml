@@ -35,30 +35,31 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Create deployment package
+      - name: Create deployment package (standalone)
         run: |
+          # standalone output banata hai .next/standalone/ mein server.js
           mkdir -p deploy-web
 
-          # Copy the entire apps/web folder (with .next inside it)
-          cp -r apps/web deploy-web/
+          # standalone folder = poora server
+          cp -r apps/web/.next/standalone/. deploy-web/
 
-          # Copy packages (shared, database) that web depends on
-          cp -r packages deploy-web/
+          # static assets copy karo
+          mkdir -p deploy-web/.next/static
+          cp -r apps/web/.next/static/. deploy-web/.next/static/
 
-          # Copy root workspace files
-          cp package.json deploy-web/
-          cp pnpm-workspace.yaml deploy-web/
-          cp pnpm-lock.yaml deploy-web/
+          # public folder copy karo
+          if [ -d apps/web/public ]; then
+            cp -r apps/web/public deploy-web/public
+          fi
 
-          # Copy node_modules (root level)
-          cp -r node_modules deploy-web/
-
-          # Create startup.sh at ROOT of deploy package
-          cat > deploy-web/startup.sh << 'EOF'
+          # server.js standalone root mein hoga already
+          # bas PORT set karke chalana hai
+          cat > deploy-web/startup.sh << 'STARTUP'
           #!/bin/bash
-          cd /home/site/wwwroot/apps/web
-          node_modules/.bin/next start -p 8080
-          EOF
+          export PORT=8080
+          export HOSTNAME=0.0.0.0
+          node /home/site/wwwroot/server.js
+          STARTUP
           chmod +x deploy-web/startup.sh
 
           cd deploy-web && zip -r ../web-deploy.zip .
@@ -91,16 +92,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build API
-        run: pnpm --filter @voice-ai/api... build
-        continue-on-error: true
-
       - name: Create deployment package
         run: |
-          mkdir -p deploy-api
-
-          # Full monorepo structure
-          cp -r apps/api deploy-api/apps/api 2>/dev/null; true
           mkdir -p deploy-api/apps
           cp -r apps/api deploy-api/apps/
           cp -r packages deploy-api/
@@ -109,7 +102,6 @@ jobs:
           cp pnpm-lock.yaml deploy-api/
           cp -r node_modules deploy-api/
 
-          # Startup script
           cat > deploy-api/startup.sh << 'STARTUP'
           #!/bin/bash
           cd /home/site/wwwroot/apps/api
