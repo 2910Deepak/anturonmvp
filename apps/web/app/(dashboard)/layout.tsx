@@ -1,5 +1,4 @@
 'use client';
-
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/sidebar';
@@ -15,7 +14,8 @@ export default function DashboardLayout({
   const params = useParams();
   const router = useRouter();
   const { user, isLoading, isAuthenticated } = useAuth();
-  const slug = params?.slug as string || user?.organization?.slug || 'demo-org';
+
+  const slug = (params?.slug as string) || (user as any)?.organization?.slug || 'demo-org';
 
   // Redirect to login if not authenticated
   useEffect(() => {
