@@ -41,21 +41,17 @@ jobs:
 
       - name: Debug build output
         run: |
-          echo "=== .next folder ==="
-          ls -la apps/web/.next/ || echo "NO .next folder!"
           echo "=== standalone folder ==="
-          ls -la apps/web/.next/standalone/ || echo "NO standalone folder!"
-          echo "=== server.js check ==="
-          ls -la apps/web/.next/standalone/server.js || echo "WARNING: server.js missing!"
-          echo "=== next.config output setting ==="
-          cat apps/web/next.config.js | grep output
+          ls -la apps/web/.next/standalone/
+          echo "=== finding server.js ==="
+          find apps/web/.next/standalone -name "server.js" || echo "server.js not found anywhere!"
 
       - name: Create deployment package
         run: |
-          if [ ! -f apps/web/.next/standalone/server.js ]; then
-            echo "ERROR: standalone/server.js not found!"
-            exit 1
-          fi
+          SERVER_JS=$(find apps/web/.next/standalone -name "server.js" | head -1)
+          echo "Found server.js at: $SERVER_JS"
+          STANDALONE_DIR=$(dirname $SERVER_JS)
+          echo "Standalone dir: $STANDALONE_DIR"
           mkdir -p deploy-web
           cp -r apps/web/.next/standalone/. deploy-web/
           mkdir -p deploy-web/.next/static
