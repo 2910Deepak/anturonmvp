@@ -32,21 +32,29 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build Web
-        run: pnpm --filter @voice-ai/web... build
+        run: pnpm --filter @voice-ai/web... build --force
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Verify standalone build
+      - name: Debug build output
         run: |
-          echo "=== Checking standalone output ==="
-          ls -la apps/web/.next/standalone/
+          echo "=== .next folder ==="
+          ls -la apps/web/.next/ || echo "NO .next folder!"
+          echo "=== standalone folder ==="
+          ls -la apps/web/.next/standalone/ || echo "NO standalone folder!"
           echo "=== server.js check ==="
-          ls -la apps/web/.next/standalone/server.js
+          ls -la apps/web/.next/standalone/server.js || echo "WARNING: server.js missing!"
+          echo "=== next.config output setting ==="
+          cat apps/web/next.config.js | grep output
 
       - name: Create deployment package
         run: |
+          if [ ! -f apps/web/.next/standalone/server.js ]; then
+            echo "ERROR: standalone/server.js not found! Build may have failed."
+            exit 1
+          fi
           mkdir -p deploy-web
           cp -r apps/web/.next/standalone/. deploy-web/
           mkdir -p deploy-web/.next/static
