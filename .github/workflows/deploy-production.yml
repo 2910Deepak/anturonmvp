@@ -35,24 +35,37 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Create deployment package
-        run: |
-          mkdir -p deploy-web/apps/web
-          cp -r apps/web/.next deploy-web/apps/web/.next
-          cp apps/web/package.json deploy-web/apps/web/package.json
-          cp apps/web/next.config.js deploy-web/apps/web/next.config.js 2>/dev/null || true
-          cp apps/web/next.config.ts deploy-web/apps/web/next.config.ts 2>/dev/null || true
-          if [ -d apps/web/public ]; then cp -r apps/web/public deploy-web/apps/web/public; fi
-          if [ -d apps/web/node_modules ]; then
-            cp -r apps/web/node_modules deploy-web/apps/web/node_modules
-          else
-            cp -r node_modules deploy-web/apps/web/node_modules
-          fi
-          cp -r packages deploy-web/packages
-          cp package.json deploy-web/package.json
-          cp pnpm-workspace.yaml deploy-web/pnpm-workspace.yaml
-          ls deploy-web/apps/web/node_modules/next/package.json && echo "next OK" || echo "next MISSING"
-          cd deploy-web && zip -r ../web-deploy.zip . && ls -lh ../web-deploy.zip
+      -- name: Create deployment package
+  run: |
+    mkdir -p deploy-web/apps/web
+
+    cp -r apps/web/.next deploy-web/apps/web/.next
+    cp apps/web/package.json deploy-web/apps/web/package.json
+
+    cp apps/web/next.config.js deploy-web/apps/web/next.config.js 2>/dev/null || true
+    cp apps/web/next.config.ts deploy-web/apps/web/next.config.ts 2>/dev/null || true
+
+    if [ -d apps/web/public ]; then
+      cp -r apps/web/public deploy-web/apps/web/public
+    fi
+
+    cp -r node_modules deploy-web/node_modules
+
+    cat > deploy-web/package.json << 'EOF'
+    {
+      "name": "voice-ai-web",
+      "private": true,
+      "scripts": {
+        "start": "cd apps/web && node ../../node_modules/next/dist/bin/next start -p 8080"
+      }
+    }
+    EOF
+
+    ls deploy-web/node_modules/next/package.json
+
+    cd deploy-web
+    zip -r ../web-deploy.zip .
+    ls -lh ../web-deploy.zip
 
       - name: Deploy Web to Azure App Service
         uses: azure/webapps-deploy@v3
