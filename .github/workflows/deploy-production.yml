@@ -1,114 +1,124 @@
 name: Deploy to Azure Production
 
 on:
-push:
-branches: [main]
-workflow_dispatch:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 env:
-NODE_VERSION: '20.x'
-PNPM_VERSION: '9'
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '9'
 
 jobs:
-deploy-web:
-name: Deploy Web to Azure
-runs-on: ubuntu-latest
+  deploy-web:
+    name: Deploy Web to Azure
+    runs-on: ubuntu-latest
 
-```
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  - name: Setup pnpm
-    uses: pnpm/action-setup@v3
-    with:
-      version: ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-  - name: Setup Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: ${{ env.NODE_VERSION }}
-      cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-  - name: Install dependencies
-    run: pnpm install --no-frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
 
-  - name: Build Web
-    run: pnpm --filter @voice-ai/web... build
-    env:
-      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-      SKIP_ENV_VALIDATION: true
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Build Web
+        run: pnpm --filter @voice-ai/web... build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          SKIP_ENV_VALIDATION: true
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  - name: Create deployment package
-    run: |
-      mkdir -p deploy-web
+      - name: Debug Next Build
+        run: |
+          echo "=== .next ==="
+          ls -la apps/web/.next
 
-      cp -r apps/web/.next/standalone/* deploy-web/
+          echo "=== standalone ==="
+          ls -la apps/web/.next/standalone || true
 
-      mkdir -p deploy-web/.next
-      cp -r apps/web/.next/static deploy-web/.next/static
+          echo "=== server.js ==="
+          ls -la apps/web/.next/standalone/server.js || true
 
-      if [ -d apps/web/public ]; then
-        cp -r apps/web/public deploy-web/public
-      fi
+          echo "=== next module ==="
+          find apps/web/.next/standalone -name next | head -20 || true
 
-      cd deploy-web
-      zip -r ../web-deploy.zip .
-      ls -lh ../web-deploy.zip
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy-web
 
-  - name: Deploy Web to Azure App Service
-    uses: azure/webapps-deploy@v3
-    with:
-      app-name: ${{ secrets.AZURE_WEBAPP_WEB_NAME }}
-      publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_WEB }}
-      package: ./web-deploy.zip
-```
+          cp -r apps/web/.next/standalone/* deploy-web/
 
-deploy-api:
-name: Deploy API to Azure
-runs-on: ubuntu-latest
+          mkdir -p deploy-web/.next
+          cp -r apps/web/.next/static deploy-web/.next/static
 
-```
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
+          if [ -d apps/web/public ]; then
+            cp -r apps/web/public deploy-web/public
+          fi
 
-  - name: Setup pnpm
-    uses: pnpm/action-setup@v3
-    with:
-      version: ${{ env.PNPM_VERSION }}
+          cd deploy-web
+          zip -r ../web-deploy.zip .
+          ls -lh ../web-deploy.zip
 
-  - name: Setup Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: ${{ env.NODE_VERSION }}
-      cache: 'pnpm'
+      - name: Deploy Web to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_WEB_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_WEB }}
+          package: ./web-deploy.zip
 
-  - name: Install dependencies
-    run: pnpm install --no-frozen-lockfile
+  deploy-api:
+    name: Deploy API to Azure
+    runs-on: ubuntu-latest
 
-  - name: Create deployment package
-    run: |
-      mkdir -p deploy-api/apps
-      cp -r apps/api deploy-api/apps/
-      cp -r packages deploy-api/
-      cp package.json deploy-api/
-      cp pnpm-workspace.yaml deploy-api/
-      cp pnpm-lock.yaml deploy-api/
-      cp -r node_modules deploy-api/
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      printf '#!/bin/bash\ncd /home/site/wwwroot/apps/api\nnode_modules/.bin/tsx src/index.ts\n' > deploy-api/startup.sh
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-      chmod +x deploy-api/startup.sh
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      cd deploy-api
-      zip -r ../api-deploy.zip .
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
 
-  - name: Deploy API to Azure App Service
-    uses: azure/webapps-deploy@v3
-    with:
-      app-name: ${{ secrets.AZURE_WEBAPP_API_NAME }}
-      publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_API }}
-      package: ./api-deploy.zip
-```
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy-api/apps
+          cp -r apps/api deploy-api/apps/
+          cp -r packages deploy-api/
+          cp package.json deploy-api/
+          cp pnpm-workspace.yaml deploy-api/
+          cp pnpm-lock.yaml deploy-api/
+          cp -r node_modules deploy-api/
+
+          printf '#!/bin/bash\ncd /home/site/wwwroot/apps/api\nnode_modules/.bin/tsx src/index.ts\n' > deploy-api/startup.sh
+
+          chmod +x deploy-api/startup.sh
+
+          cd deploy-api
+          zip -r ../api-deploy.zip .
+
+      - name: Deploy API to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_API_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_API }}
+          package: ./api-deploy.zip
