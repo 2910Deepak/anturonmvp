@@ -13,7 +13,6 @@ jobs:
   deploy-web:
     name: Deploy Web to Azure
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,35 +38,27 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Debug Next Build
+      - name: Verify standalone build
         run: |
-          echo "=== .next ==="
-          ls -la apps/web/.next
-
-          echo "=== standalone ==="
-          ls -la apps/web/.next/standalone || true
-
-          echo "=== server.js ==="
-          ls -la apps/web/.next/standalone/server.js || true
-
-          echo "=== next module ==="
-          find apps/web/.next/standalone -name next | head -20 || true
+          echo "=== Checking standalone output ==="
+          ls -la apps/web/.next/standalone/
+          echo "=== server.js check ==="
+          ls -la apps/web/.next/standalone/server.js
 
       - name: Create deployment package
         run: |
           mkdir -p deploy-web
-
-          cp -r apps/web/.next/standalone/* deploy-web/
-
-          mkdir -p deploy-web/.next
-          cp -r apps/web/.next/static deploy-web/.next/static
-
+          cp -r apps/web/.next/standalone/. deploy-web/
+          mkdir -p deploy-web/.next/static
+          cp -r apps/web/.next/static/. deploy-web/.next/static/
           if [ -d apps/web/public ]; then
-            cp -r apps/web/public deploy-web/public
+            cp -r apps/web/public/. deploy-web/public/
           fi
-
+          echo "=== deploy-web contents ==="
+          ls -la deploy-web/
           cd deploy-web
           zip -r ../web-deploy.zip .
+          echo "=== zip size ==="
           ls -lh ../web-deploy.zip
 
       - name: Deploy Web to Azure App Service
@@ -80,7 +71,6 @@ jobs:
   deploy-api:
     name: Deploy API to Azure
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -108,11 +98,8 @@ jobs:
           cp pnpm-workspace.yaml deploy-api/
           cp pnpm-lock.yaml deploy-api/
           cp -r node_modules deploy-api/
-
           printf '#!/bin/bash\ncd /home/site/wwwroot/apps/api\nnode_modules/.bin/tsx src/index.ts\n' > deploy-api/startup.sh
-
           chmod +x deploy-api/startup.sh
-
           cd deploy-api
           zip -r ../api-deploy.zip .
 
