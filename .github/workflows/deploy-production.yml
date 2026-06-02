@@ -30,6 +30,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+        env:
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+          PRISMA_SKIP_POSTINSTALL_GENERATE: true
 
       - name: Build Web
         run: pnpm --filter @voice-ai/web... build
@@ -38,6 +41,7 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
 
       - name: Create deployment package
         run: |
@@ -50,17 +54,13 @@ jobs:
           if [ -d apps/web/public ]; then
             cp -r apps/web/public/. deploy-web/public/
           fi
-          # Oryx ko disable karne ke liye
           echo '{ "scripts": { "build": "echo Already built" } }' > deploy-web/package.json
-          # .deployment file add karo
           echo '[config]' > deploy-web/.deployment
           echo 'SCM_DO_BUILD_DURING_DEPLOYMENT=false' >> deploy-web/.deployment
           echo "=== deploy-web contents ==="
           ls -la deploy-web/
-          ls -la deploy-web/apps/web/ || true
           cd deploy-web
           zip -r ../web-deploy.zip .
-          echo "=== zip size ==="
           ls -lh ../web-deploy.zip
 
       - name: Deploy Web to Azure App Service
@@ -90,6 +90,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+        env:
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+          PRISMA_SKIP_POSTINSTALL_GENERATE: true
 
       - name: Create deployment package
         run: |
