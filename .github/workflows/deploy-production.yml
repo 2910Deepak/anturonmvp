@@ -37,57 +37,33 @@ jobs:
 
       - name: Create deployment package
         run: |
-          mkdir -p deploy-web
+          mkdir -p deploy-web/apps/web
+          mkdir -p deploy-web/node_modules
 
-          # Copy entire apps/web WITH node_modules
-          cp -r apps/web deploy-web/apps/web
+          # Copy built web app
+          cp -r apps/web/.next deploy-web/apps/web/.next
+          cp -r apps/web/public deploy-web/apps/web/public 2>/dev/null || true
+          cp apps/web/package.json deploy-web/apps/web/package.json
+          cp apps/web/next.config.js deploy-web/apps/web/next.config.js 2>/dev/null || true
+          cp apps/web/next.config.ts deploy-web/apps/web/next.config.ts 2>/dev/null || true
 
-          # Copy root node_modules (for shared packages)
-          cp -r node_modules deploy-web/node_modules
+          # Copy web node_modules (has next inside)
+          cp -r apps/web/node_modules deploy-web/apps/web/node_modules 2>/dev/null || \
+          cp -r node_modules deploy-web/apps/web/node_modules
 
           # Copy packages
           cp -r packages deploy-web/packages
+          cp package.json deploy-web/package.json
+          cp pnpm-workspace.yaml deploy-web/pnpm-workspace.yaml
 
-          # Copy workspace files
-          cp package.json deploy-web/
-          cp pnpm-workspace.yaml deploy-web/
-          cp pnpm-lock.yaml deploy-web/
-
-          # Create server.js at ROOT that points to apps/web
-          cat > deploy-web/server.js << 'SERVEREOF'
-const { createServer } = require('http');
-const { parse } = require('url');
-const path = require('path');
-
-process.chdir(path.join(__dirname, 'apps/web'));
-const next = require('./node_modules/next');
-
-const dev = false;
-const hostname = '0.0.0.0';
-const port = parseInt(process.env.PORT || '8080', 10);
-
-const app = next({ dev, hostname, port, dir: __dirname });
-const handle = app.getRequestHandler();
-
-app.prepare().then(() => {
-  createServer(async (req, res) => {
-    try {
-      const parsedUrl = parse(req.url, true);
-      await handle(req, res, parsedUrl);
-    } catch (err) {
-      console.error('Error:', err);
-      res.statusCode = 500;
-      res.end('internal server error');
-    }
-  }).listen(port, hostname, (err) => {
-    if (err) throw err;
-    console.log(`> Ready on http://${hostname}:${port}`);
-  });
-});
-SERVEREOF
+          # List what we have
+          echo "=== deploy-web structure ==="
+          ls -la deploy-web/
+          ls -la deploy-web/apps/web/
+          echo "=== next module check ==="
+          ls deploy-web/apps/web/node_modules/next/package.json 2>/dev/null && echo "next FOUND" || echo "next NOT FOUND"
 
           cd deploy-web && zip -r ../web-deploy.zip .
-          echo "=== ZIP size ==="
           ls -lh ../web-deploy.zip
 
       - name: Deploy Web to Azure App Service
@@ -134,7 +110,6 @@ cd /home/site/wwwroot/apps/api
 node_modules/.bin/tsx src/index.ts
 STARTUP
           chmod +x deploy-api/startup.sh
-
           cd deploy-api && zip -r ../api-deploy.zip .
 
       - name: Deploy API to Azure App Service
